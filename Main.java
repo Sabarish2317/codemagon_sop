@@ -1,6 +1,12 @@
 import java.io.*;
 import java.util.*;
-import java.util.stream.Collectors;
+
+
+class InvalidInputException extends Exception {
+    public InvalidInputException(String message) {
+        super(message);
+    }
+}
 
 class House {
     private int id;
@@ -10,7 +16,16 @@ class House {
     private String owner;
     private boolean isBooked;
 
-    public House(int id, String location, double price, int bedrooms, String owner) {
+    public House(int id, String location, double price, int bedrooms, String owner) throws InvalidInputException {
+        if (id < 0) {
+            throw new InvalidInputException("House ID cannot be negative.");
+        }
+        if (price < 0) {
+            throw new InvalidInputException("House price cannot be negative.");
+        }
+        if (bedrooms < 0) {
+            throw new InvalidInputException("Number of bedrooms cannot be negative.");
+        }
         this.id = id;
         this.location = location;
         this.price = price;
@@ -29,7 +44,7 @@ class House {
 
     @Override
     public String toString() {
-        return id + ", " + location + ", " + price + ", " + bedrooms + " beds, Owner: " + owner + ", Booked: " + isBooked;
+        return id + "," + location + "," + price + "," + bedrooms + "," + owner + "," + isBooked;
     }
 }
 
@@ -38,7 +53,13 @@ class Tenant {
     private String contact;
     private String preferredLocation;
 
-    public Tenant(String name, String contact, String preferredLocation) {
+    public Tenant(String name, String contact, String preferredLocation) throws InvalidInputException {
+        if (name == null || name.trim().isEmpty()) {
+            throw new InvalidInputException("Tenant name cannot be empty.");
+        }
+        if (contact == null || contact.trim().isEmpty()) {
+            throw new InvalidInputException("Contact information cannot be empty.");
+        }
         this.name = name;
         this.contact = contact;
         this.preferredLocation = preferredLocation;
@@ -50,7 +71,7 @@ class Tenant {
 
     @Override
     public String toString() {
-        return name + " (Contact: " + contact + ", Prefers: " + preferredLocation + ")";
+        return name + "," + contact + "," + preferredLocation;
     }
 }
 
@@ -60,76 +81,82 @@ class HouseRentalSystem {
     private Scanner scanner = new Scanner(System.in);
 
     public void addHouse() {
-        System.out.print("Enter House ID: ");
-        int id = scanner.nextInt();
-        scanner.nextLine();
-        System.out.print("Enter Location: ");
-        String location = scanner.nextLine();
-        System.out.print("Enter Price: ");
-        double price = scanner.nextDouble();
-        System.out.print("Enter Bedrooms: ");
-        int bedrooms = scanner.nextInt();
-        scanner.nextLine();
-        System.out.print("Enter Owner Name: ");
-        String owner = scanner.nextLine();
-        houses.add(new House(id, location, price, bedrooms, owner));
-        System.out.println("House added successfully.");
+        try {
+            System.out.print("Enter House ID: ");
+            int id = Integer.parseInt(scanner.nextLine());
+            System.out.print("Enter Location: ");
+            String location = scanner.nextLine();
+            System.out.print("Enter Price: ");
+            double price = Double.parseDouble(scanner.nextLine());
+            System.out.print("Enter Bedrooms: ");
+            int bedrooms = Integer.parseInt(scanner.nextLine());
+            System.out.print("Enter Owner Name: ");
+            String owner = scanner.nextLine();
+            
+            House newHouse = new House(id, location, price, bedrooms, owner);
+            houses.add(newHouse);
+            System.out.println("House added successfully.");
+        } catch (NumberFormatException e) {
+            System.out.println("Invalid input. Please enter numeric values for ID, Price, and Bedrooms.");
+        } catch (InvalidInputException e) {
+            System.out.println("Error: " + e.getMessage());
+        }
     }
 
     public void registerTenant() {
-        System.out.print("Enter Tenant Name: ");
-        String name = scanner.nextLine();
-        System.out.print("Enter Contact: ");
-        String contact = scanner.nextLine();
-        System.out.print("Enter Preferred Location: ");
-        String preferredLocation = scanner.nextLine();
-        tenants.add(new Tenant(name, contact, preferredLocation));
-        System.out.println("Tenant registered successfully.");
-    }
-
-   public void searchHouses() {
-        System.out.print("Enter location to search: ");
-        String location = scanner.nextLine();
-        System.out.print("Enter maximum price: ");
-        double maxPrice = scanner.nextDouble();
-        List<House> availableHouses = houses.stream()
-            .filter(house -> house.getLocation().equalsIgnoreCase(location) && house.getPrice() <= maxPrice && !house.isBooked())
-            .collect(Collectors.toList());
-        
-        if (availableHouses.isEmpty()) {
-            System.out.println("No available houses in " + location + " under price " + maxPrice);
-        } else {
-            availableHouses.forEach(System.out::println);
+        try {
+            System.out.print("Enter Tenant Name: ");
+            String name = scanner.nextLine();
+            System.out.print("Enter Contact: ");
+            String contact = scanner.nextLine();
+            System.out.print("Enter Preferred Location: ");
+            String preferredLocation = scanner.nextLine();
+            
+            Tenant newTenant = new Tenant(name, contact, preferredLocation);
+            tenants.add(newTenant);
+            System.out.println("Tenant registered successfully.");
+        } catch (InvalidInputException e) {
+            System.out.println("Error: " + e.getMessage());
         }
     }
 
     public void bookHouse() {
-        System.out.print("Enter House ID to book: ");
-        int houseId = scanner.nextInt();
-        for (House house : houses) {
-            if (house.getId() == houseId && !house.isBooked()) {
-                synchronized (house) {
-                    house.bookHouse();
-                    System.out.println("House booked successfully.");
+        try {
+            System.out.print("Enter House ID to book: ");
+            int houseId = Integer.parseInt(scanner.nextLine());
+            
+            for (House house : houses) {
+                if (house.getId() == houseId && !house.isBooked()) {
+                    synchronized (house) {
+                        house.bookHouse();
+                        System.out.println("House booked successfully.");
+                    }
+                    return;
                 }
-                return;
             }
+            System.out.println("House not found or already booked.");
+        } catch (NumberFormatException e) {
+            System.out.println("Invalid input. Please enter a valid House ID.");
         }
-        System.out.println("House not found or already booked.");
     }
 
     public void saveData() {
-        try (BufferedWriter houseWriter = new BufferedWriter(new FileWriter("houses.txt"));
-             BufferedWriter tenantWriter = new BufferedWriter(new FileWriter("tenants.txt"))) {
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter("houses.txt"))) {
             for (House house : houses) {
-                houseWriter.write(house.getId() + "," + house.getLocation() + "," + house.getPrice() + "," + house.getBedrooms() + "," + house.getOwner() + "," + house.isBooked() + "\n");
+                writer.write(house.toString() + "\n");
             }
-            for (Tenant tenant : tenants) {
-                tenantWriter.write(tenant.getName() + "," + tenant.getContact() + "," + tenant.getPreferredLocation() + "\n");
-            }
-            System.out.println("Data saved successfully.");
+            System.out.println("Houses saved successfully.");
         } catch (IOException e) {
-            System.out.println("Error saving data: " + e.getMessage());
+            System.out.println("Error saving houses: " + e.getMessage());
+        }
+
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter("tenants.txt"))) {
+            for (Tenant tenant : tenants) {
+                writer.write(tenant.toString() + "\n");
+            }
+            System.out.println("Tenants saved successfully.");
+        } catch (IOException e) {
+            System.out.println("Error saving tenants: " + e.getMessage());
         }
     }
 
@@ -138,21 +165,26 @@ class HouseRentalSystem {
             System.out.println("\nHouse Rental Management System");
             System.out.println("1. Add House");
             System.out.println("2. Register Tenant");
-            System.out.println("3. Search Houses");
-            System.out.println("4. Book House");
-            System.out.println("5. Save Data");
-            System.out.println("6. Exit");
+            System.out.println("3. Book House");
+            System.out.println("4. Save Data");
+            System.out.println("5. Exit");
             System.out.print("Choose an option: ");
-            int choice = scanner.nextInt();
-            scanner.nextLine();
-            switch (choice) {
-                case 1 -> addHouse();
-                case 2 -> registerTenant();
-                case 3 -> searchHouses();
-                case 4 -> bookHouse();
-                case 5 -> saveData();
-                case 6 -> { System.out.println("Exiting..."); return; }
-                default -> System.out.println("Invalid choice!");
+            
+            try {
+                int choice = Integer.parseInt(scanner.nextLine());
+                switch (choice) {
+                    case 1 -> addHouse();
+                    case 2 -> registerTenant();
+                    case 3 -> bookHouse();
+                    case 4 -> saveData();
+                    case 5 -> { 
+                        System.out.println("Exiting..."); 
+                        return; 
+                    }
+                    default -> System.out.println("Invalid choice!");
+                }
+            } catch (NumberFormatException e) {
+                System.out.println("Please enter a valid number.");
             }
         }
     }

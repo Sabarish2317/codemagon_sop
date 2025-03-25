@@ -1,1 +1,0 @@
-# codemagon_sop
